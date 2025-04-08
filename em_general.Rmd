@@ -3,9 +3,6 @@ title: "R Notebook"
 output: html_notebook
 ---
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
-
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
 
 ```{r}
 # Helper function
@@ -30,7 +27,7 @@ dmvnorm <- function(Mu, Sigma, x) {
 
 ```{r}
 # EM Robust algorithm
-EM_Robust <- function(X, nC, tol = 1e-10, m_iter=1e5) {
+EM_Robust <- function(X, nC, tol = 1e-10, m_iter=1e4) {
   # Estimates centers of Gaussian Mixture models without manual initialization:
   #
   # Args:
@@ -175,12 +172,14 @@ EM_Robust <- function(X, nC, tol = 1e-10, m_iter=1e5) {
   }
   # If failed to converge
   message(paste("failed to converge in", m_iter,"iterations."))
-  return(NULL)
+  OUT <- list(mu = mu_update, 
+                  Sigma = Sigma, 
+                  alpha = alpha,
+                  iter = i,
+                  outliers = outliers) 
+      # return a named list of elements of interest
+  return(OUT)
 }
-```
-
-```{r}
-
 ```
 
 ```{r}
