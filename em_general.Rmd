@@ -86,8 +86,7 @@ EM_Robust <- function(X, nC, tol = 1e-10, m_iter=1e5) {
   mu <- mu_update
   
   # Loop: 
-  for (i in 1:14) {
-    message(i)
+  for (i in 1:m_iter) {
     # update of alpha
     a_em = colSums(Z)/n 
     alpha_update = sapply(1:C[[i]], function(k, alpha, a_em) {
@@ -126,7 +125,6 @@ EM_Robust <- function(X, nC, tol = 1e-10, m_iter=1e5) {
       }
     }
     
-    message(dim(Z))
     outlier <- which(is.na(Z[,1]))
     if (length(outlier) > 0) {
       Z <- Z[-outlier,]
@@ -187,12 +185,12 @@ EM_Robust <- function(X, nC, tol = 1e-10, m_iter=1e5) {
 
 ```{r}
 ## 20 simulations
-set.seed(1)
+set.seed(5)
 reg_ems <- list()
 robust_ems <- list()
 datasets <- list()
 C = 3
-n <- 20
+n <- 3
 
 for (i in 1:n){
   message(i)
@@ -220,7 +218,7 @@ for (i in 1:n){
   
   ## Run robust
   print(paste0(format(Sys.time(),'%H:%M:%S'), " - Robust ", i))
-  robust_ems[[i]] <- EM_Robust(X)
+  robust_ems[[i]] <- EM_Robust(X, 300)
 }
 ```
 Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
