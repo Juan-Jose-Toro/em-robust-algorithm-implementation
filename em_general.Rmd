@@ -30,31 +30,34 @@ dmvnorm <- function(Mu, Sigma, x) {
 
 ```{r}
 # EM Robust algorithm
-EM_Robust <- function(X, tol = 1e-10, m_iter=1e5) {
+EM_Robust <- function(X, nC, tol = 1e-10, m_iter=1e5) {
   # Estimates centers of Gaussian Mixture models without manual initialization:
   #
   # Args:
   #   X: Data, d by n matrix, n obs, d variate
   #   tol: tolerance for convergence
   #   m_iter: max iterations
+  #   nC: number of clusters, should be <= n
   #
   # Returns:
   #   The estimated K centers from data X, variances, and contributions 
   
   n = dim(X)[2] # number of observations
   d = dim(X)[1] # dimension of data
-  
+  nC <- n
   # init beta:
   beta = 1
   # init C, C idx is shifted by 1, C[[iter_t+1]] is C[[t]] 
-  C <- list(n)
+  C <- list(nC)
   # init alpha as 1/c(initial)
-  alpha = rep(1/n, n)
+  alpha = rep(1/nC, nC)
   # init mu with every observations in X
   mu_update <- lapply(1:n, function(k) { X[,k] })
   # init Sigma
   tmp = ceiling(sqrt(n))
   d_m = .Machine$double.xmax
+  
+  outliers <- c()
   for (i in 1:(n-1)) {
     for (j in (i+1):n){
       dif <- norm(X[,i] - X[,j], "2")^2
@@ -83,7 +86,8 @@ EM_Robust <- function(X, tol = 1e-10, m_iter=1e5) {
   mu <- mu_update
   
   # Loop: 
-  for (i in 1:m_iter) {
+  for (i in 1:14) {
+    message(i)
     # update of alpha
     a_em = colSums(Z)/n 
     alpha_update = sapply(1:C[[i]], function(k, alpha, a_em) {
@@ -109,9 +113,7 @@ EM_Robust <- function(X, tol = 1e-10, m_iter=1e5) {
     # update number of clusters
     C[[i+1]] <- length(alpha_update)
     # update alpha, eq 15
-    alpha <- sapply(alpha_update, function(a, a_sum) {
-      a/a_sum
-    }, sum(alpha_update))
+    alpha <- alpha_update/sum(alpha_update)
     # update Z, eq 16
     Z <- as.matrix(Z[,keep])
     for (j in 1:n) {
@@ -124,7 +126,14 @@ EM_Robust <- function(X, tol = 1e-10, m_iter=1e5) {
       }
     }
     
-    
+    message(dim(Z))
+    outlier <- which(is.na(Z[,1]))
+    if (length(outlier) > 0) {
+      Z <- Z[-outlier,]
+      outliers <- cbind(outliers, X[,outlier])
+      X <- X[,-outlier]
+      n <- n - length(outlier)
+    }
     
     # update Sigma
     Sigma <- lapply(1:C[[i+1]], function(k, X, mu_update, Z, d, d_m) {
@@ -132,6 +141,7 @@ EM_Robust <- function(X, tol = 1e-10, m_iter=1e5) {
       # compute all X_i - Mu
       x_diff_mu <- sweep(X, MARGIN = 1, STATS = mu_update[[k]]) 
       # eq 26
+      
       vcovs <- matrix(as.matrix(apply(x_diff_mu, 2, function(x) {
         x %*% t(x)
       }))%*%Z[,k], d, d)/sum(Z[,k])
@@ -158,7 +168,8 @@ EM_Robust <- function(X, tol = 1e-10, m_iter=1e5) {
       OUT <- list(mu = mu_update, 
                   Sigma = Sigma, 
                   alpha = alpha,
-                  iter = i) 
+                  iter = i,
+                  outliers = outliers) 
       # return a named list of elements of interest
       return(OUT)
     }
@@ -181,7 +192,7 @@ reg_ems <- list()
 robust_ems <- list()
 datasets <- list()
 C = 3
-n <- 2
+n <- 20
 
 for (i in 1:n){
   message(i)
