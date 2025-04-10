@@ -145,7 +145,7 @@ plot_ellipse_n_center(t_coords = t_coords, res = EM_res, mu_list = mu_list, C_pr
 #### robust
 
 ```{r}
-EMR_res <- EM_Robust(t_coords)
+EMR_res <- EM_Robust(t_coords, n-1)
 #EMR_res
 
 C_pred = length(EMR_res[["mu"]])
@@ -203,7 +203,7 @@ eval_EM(res = EM_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
 #### robust
 
 ```{r}
-EMR_res <- EM_Robust(t_coords)
+EMR_res <- EM_Robust(t_coords, n-1)
 #EMR_res
 
 C_pred = length(EMR_res[["mu"]])
@@ -259,7 +259,7 @@ eval_EM(res = EM_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
 #### robust
 
 ```{r}
-EMR_res <- EM_Robust(t_coords)
+EMR_res <- EM_Robust(t_coords, n-1)
 EMR_res
 
 C_pred = length(EMR_res[["mu"]])
@@ -323,7 +323,7 @@ eval_EM(res = EM_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
 #### robust
 
 ```{r}
-EMR_res <- EM_Robust(t_coords)
+EMR_res <- EM_Robust(t_coords, n-1)
 #EMR_res
 
 C_pred = length(EMR_res[["mu"]])
@@ -337,14 +337,19 @@ eval_EM(res = EMR_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
 ```{r}
 
 set.seed(2)
-m = 10 # NUMBER OF TESTS
-n <- 500     # Number of data points
+m = 3 # NUMBER OF TESTS
+n <- 200     # Number of data points
 dim = 2
 
 wrong_ks = 0
-mu_error_list = numeric(m)
-score_list = numeric(m)
-sigma_error_list = numeric(m)
+robust_mu_error_list = numeric(m)
+robust_score_list = numeric(m)
+robust_sigma_error_list = numeric(m)
+
+# original EM
+original_mu_error_list = numeric(m)
+original_score_list = numeric(m)
+original_sigma_error_list = numeric(m)
 
 for (i in 1:m) {
   k = sample(2:5, size = 1) # number of clusters
@@ -371,30 +376,40 @@ for (i in 1:m) {
   Z <- sample(1:C, n, replace = T)
   t_coords = t(coords)
   
-  EMR_res <- EM_Robust(t_coords)
+  EM_res <- EM(X=t_coords, C=C, Z=Z, tol=1e-10, m_iter=1e3) # always true number of clusters
+  
+  original_results = eval_EM(res = EM_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
+  
+  original_mu_error_list[i] = original_results[["mu_error"]]
+  original_score_list[i] = original_results[["score"]]
+  original_sigma_error_list[i] = original_results[["sigma_error"]]
+  
+  ########################
+  
+  EMR_res <- EM_Robust(t_coords, n-1)
   #EMR_res
   
   C_pred = length(EMR_res[["mu"]])
   plot_ellipse_n_center(t_coords = t_coords, res = EMR_res, mu_list = mu_list, C_pred = C_pred)
   
-  results = eval_EM(res = EMR_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
+  robust_results = eval_EM(res = EMR_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
   
-  if (results[1] != -1) {
-    mu_error_list[i] = results[["mu_error"]]
-    score_list[i] = results[["score"]]
-    sigma_error_list[i] = results[["sigma_error"]]
+  if (robust_results[1] != -1) {
+    robust_mu_error_list[i] = robust_results[["mu_error"]]
+    robust_score_list[i] = robust_results[["score"]]
+    robust_sigma_error_list[i] = robust_results[["sigma_error"]]
     
   } else {
     wrong_ks = wrong_ks + 1
-    mu_error_list[i] = -1
-    score_list[i] = -1
-    sigma_error_list[i] = -1
+    robust_mu_error_list[i] = -1
+    robust_score_list[i] = -1
+    robust_sigma_error_list[i] = -1
   }
   
 }
 
 
-all_results = data.frame(cbind(mu_error_list, score_list, sigma_error_list))
+all_results = data.frame(cbind(robust_mu_error_list, robust_score_list, robust_sigma_error_list, original_mu_error_list, original_score_list,original_sigma_error_list))
 
 ```
 ```{r}
@@ -405,7 +420,7 @@ useful_results = subset(all_results, score_list!=-1)
 
 
 
-kable(useful_results, col.names = c("mean mu error", "center accuracy score", "mean sigma error"),digits = 4)
+kable(useful_results, col.names = c("robust mean mu error", "robust center accuracy score", "robust mean sigma error", "regular mean mu error", "regular center accuracy score", "regular mean sigma error"),digits = 4)
 
 ```
 *mean mu error* is the mean euclidean distance between the true and predicted centers.  
@@ -418,5 +433,5 @@ performance conclusion:
 
 <!-- -->
 
-a.  performs the same as original EM with correct cluster guess, performs better than the original with wrong guesses.
+a. If robust is predicting correct number of clusters, it's accuracy is the same as original EM with correct cluster guess
 b.  takes less iterations but more time
