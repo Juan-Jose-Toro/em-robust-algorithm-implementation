@@ -1,0 +1,422 @@
+---
+title: "Project"
+output: pdf_document
+date: "2025-03-30"
+---
+
+# Normal Mixture model tests
+
+## helper functions
+
+```{r}
+library(mvtnorm)
+library(stats)
+library(ggplot2)
+library(proxy)
+library(clue)
+
+source("em_general.R")
+
+generate_GMM = function(n, k=3, dim = 2, mu_list = list(c(0,0), c(0,2), c(2,0)), prob = rep(1/3, 3), I2_list = lapply(1:3, function(x) diag(1, 2))){
+  # n: number of samples
+  # k: number of components
+  # dim: # of dimension of the sample, mu = c(0,0) should be dim 2
+  # prob: list of numbers(int/float) of probability of each cluster, should be of length k
+  # I2_list: list of covariate matrices for rmvnorm(), list should be of length k, matrix should be dim x dim
+  
+  #sigma2 <- 1 / beta  # Variance = 1/beta
+  #I2 <- diag(1/beta, dim) #* sigma2  # Covariance matrix
+  
+  # Define means for the three clusters
+  #mu_list <- list(c(0,0), c(0,2), c(2,0))
+  
+  # Generate categorical assignments Z
+  Z <- sample(1:k, size = n, replace = TRUE, prob = prob)
+  #print(length(Z))
+  
+  #print(I2_list)
+  
+  # Generate X given Z
+  X <- matrix(0, n, dim)
+  for (i in 1:n) {
+    X[i, ] <- rmvnorm(1, mean = mu_list[[Z[i]]], sigma = I2_list[[Z[i]]])
+  }
+  list(X,Z)
+}
+
+eval_EM = function(res, mu_list, dim, I2_list, threshold = 0.1) {
+  mu_predict = matrix(unlist(res[["mu"]]), ncol = dim, byrow = TRUE)
+  mu_true = matrix(unlist(mu_list), ncol = dim, byrow = TRUE)
+  
+  #print(length(mu_predict))
+  #print(length(mu_true))
+  
+  if (length(mu_predict) != length(mu_true)) {
+    message("predicted wrong number of clusters")
+    return(-1) 
+    }
+  
+  dist_matrix <- proxy::dist(mu_true, mu_predict,  method = "Euclidean")
+  #dist_matrix
+  assignment <- clue::solve_LSAP(as.matrix(dist_matrix), maximum = FALSE)
+  #assignment
+  matched_distances <- dist_matrix[cbind(1:length(assignment), assignment)]
+  accuracy_score = sum(matched_distances < threshold) / length(assignment)   
+  #print(assignment)
+  
+  sigma_pred = res[["Sigma"]]
+  sigma_true = I2_list
+  
+  sigma_error <- function(true_sigma, pred_sigma) {
+    sqrt(sum((true_sigma - pred_sigma)^2))  # Frobenius norm
+  }
+  
+  k = length(sigma_pred)
+  errors <- numeric(k)
+  for (i in 1:k) {
+    errors[i] <- sigma_error(sigma_true[[i]], sigma_pred[[assignment[i]]])
+  }
+  
+  return(list(mu_error = mean(matched_distances), score = accuracy_score, sigma_error = mean(errors)))
+}
+
+
+plot_ellipse_n_center = function(t_coords, res, mu_list, C_pred){
+
+  plot(x = t_coords[1,], y = t_coords[2,], 
+       col = adjustcolor(col = "black" ,alpha.f = 0.5), pch = 19)
+  
+  # Ellipse
+  for (i in 1:C_pred) {
+    draw_ellipse(res, i)
+  }
+  
+  mu_true = matrix(unlist(mu_list), ncol = dim, byrow = TRUE)
+  points(x = mu_true[,1], y = mu_true[,2], col = "blue", pch = 19)
+
+}
+  
+```
+
+### 2d sample with 3 mixtures
+
+```{r}
+set.seed(1)
+n <- 500     # Number of data points
+mu_list <- list(c(0,0), c(0,5), c(5,0))
+dim = 2 # dim: # of dimension of the sample, mu = c(0,0) should be dim 2
+k = 3 # k: number of components
+prob = rep(1/k, k)
+beta = 1
+I2_list = lapply(1:3, function(x) diag(1, 2))
+
+#XZ = generate_GMM(n)
+XZ = generate_GMM(n, k =k, dim = dim, mu_list = mu_list, prob = prob, I2_list=I2_list)
+
+coords = XZ[[1]]
+group = XZ[[2]]
+dat = cbind(coords,group)
+colnames(dat) = c("X", "Y", "Group")
+
+# Plot the generated data
+ggplot(data = dat) +
+  geom_point(aes(x = X, y = Y, colour = factor(Group)))
+#plot(X, col = Z, pch = 16, main = "Generated Data")
+
+```
+
+#### correct guess for centers
+
+```{r}
+C = 3 #number of centers
+Z <- sample(1:C, n, replace = T)
+t_coords = t(coords)
+
+EM_res <- EM(X=t_coords, C=C, Z=Z, tol=1e-10, m_iter=1e3)
+EM_res
+
+eval_EM(res = EM_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
+
+C_pred = length(EM_res[["mu"]])
+plot_ellipse_n_center(t_coords = t_coords, res = EM_res, mu_list = mu_list, C_pred = C_pred)
+
+```
+
+#### robust
+
+```{r}
+EMR_res <- EM_Robust(t_coords)
+#EMR_res
+
+C_pred = length(EMR_res[["mu"]])
+plot_ellipse_n_center(t_coords = t_coords, res = EMR_res, mu_list = mu_list, C_pred = C_pred)
+
+eval_EM(res = EMR_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
+
+
+
+```
+
+### another 2d sample with 3 mixtures
+
+```{r}
+set.seed(1)
+n <- 800     # Number of data points
+mu_list <- list(c(2,2), c(-4,-4), c(-4,-4))
+dim = 2 # dim: # of dimension of the sample, mu = c(0,0) should be dim 2
+k = 3 # k: number of components
+prob = c(1,1,0.5)
+I2_list = list(diag(c(1,1)), diag(c(6,2)), diag(c(1/5,1/5)))
+
+#XZ = generate_GMM(n)
+XZ = generate_GMM(n, k =k, dim = dim, mu_list = mu_list, prob = prob, I2_list = I2_list)
+
+coords = XZ[[1]]
+group = XZ[[2]]
+dat = cbind(coords,group)
+colnames(dat) = c("X", "Y", "Group")
+
+# Plot the generated data
+ggplot(data = dat) +
+  geom_point(aes(x = X, y = Y, colour = factor(Group)))
+#plot(X, col = Z, pch = 16, main = "Generated Data")
+
+```
+
+#### correct guess for centers
+
+```{r}
+C = 3 #number of centers
+Z <- sample(1:C, n, replace = T)
+t_coords = t(coords)
+
+EM_res <- EM(X=t_coords, C=C, Z=Z, tol=1e-10, m_iter=1e5)
+#EM_res
+
+C_pred = length(EM_res[["mu"]])
+plot_ellipse_n_center(t_coords = t_coords, res = EM_res, mu_list = mu_list, C_pred = C_pred)
+
+eval_EM(res = EM_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
+
+```
+
+#### robust
+
+```{r}
+EMR_res <- EM_Robust(t_coords)
+#EMR_res
+
+C_pred = length(EMR_res[["mu"]])
+plot_ellipse_n_center(t_coords = t_coords, res = EMR_res, mu_list = mu_list, C_pred = C_pred)
+
+eval_EM(res = EMR_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
+
+```
+
+### 2d sample with 5 mixtures
+
+```{r}
+set.seed(1)
+n <- 500     # Number of data points
+mu_list <- list(c(0,0), c(0,5), c(5,0), c(-5,0), c(0,-5))
+dim = 2 
+k = 5
+prob = rep(1/k, k)
+I2_list = lapply(1:k, function(x) diag(1,dim))
+
+#XZ = generate_GMM(n)
+XZ = generate_GMM(n, k =k, dim = dim, mu_list = mu_list, prob = prob, I2_list=I2_list)
+
+coords = XZ[[1]]
+group = XZ[[2]]
+dat = cbind(coords,group)
+colnames(dat) = c("X", "Y", "Group")
+
+# Plot the generated data
+ggplot(data = dat) +
+  geom_point(aes(x = X, y = Y, colour = factor(Group)))
+#plot(X, col = Z, pch = 16, main = "Generated Data")
+
+```
+
+#### correct guess for centers
+
+```{r}
+C = 5 #number of centers
+Z <- sample(1:C, n, replace = T)
+t_coords = t(coords)
+
+EM_res <- EM(X=t_coords, C=C, Z=Z, tol=1e-10, m_iter=1e3)
+EM_res
+
+C_pred = length(EM_res[["mu"]])
+plot_ellipse_n_center(t_coords = t_coords, res = EM_res, mu_list = mu_list, C_pred = C_pred)
+
+eval_EM(res = EM_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
+
+```
+
+#### robust
+
+```{r}
+EMR_res <- EM_Robust(t_coords)
+EMR_res
+
+C_pred = length(EMR_res[["mu"]])
+plot_ellipse_n_center(t_coords = t_coords, res = EMR_res, mu_list = mu_list, C_pred = C_pred)
+
+eval_EM(res = EMR_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
+
+```
+
+### 3d sample with 3 mixtures
+
+```{r}
+library(plotly)
+set.seed(1)
+n <- 200     # Number of data points
+mu_list <- list(
+  c(0, 0, 0),
+  c(5, 0, 0),
+  c(0, 5, 0)
+) # -> dim = 3, k = 3
+dim = 3
+k = 3
+prob = rep(1/k, k)
+I2_list = list(diag(c(1,1,1)), diag(c(1,1,1)), diag(c(1,1,1)))
+
+#XZ = generate_GMM(n)
+XZ = generate_GMM(n, k =k, dim = dim, mu_list = mu_list, prob = prob, I2_list = I2_list)
+
+coords = XZ[[1]]
+group = XZ[[2]]
+dat = data.frame(cbind(coords, group))
+colnames(dat) = c("X", "Y", "Z", "Group")
+
+# Plot the generated data
+fig = plot_ly(dat, x = ~X, y = ~Y, z = ~Z, 
+             type = "scatter3d", mode = "markers",
+              color = ~Group, size = 1)
+fig
+
+ggplot(data = dat, aes(x=X, y=Y, colour = factor(Group))) +
+  geom_point()
+```
+
+#### correct guess for centers
+
+```{r}
+C = 3 #number of centers
+Z <- sample(1:C, n, replace = T)
+t_coords = t(coords)
+
+EM_res <- EM(X=t_coords, C=C, Z=Z, tol=1e-10, m_iter=1e3)
+#EM_res
+
+C_pred = length(EM_res[["mu"]])
+plot_ellipse_n_center(t_coords = t_coords, res = EM_res, mu_list = mu_list, C_pred = C_pred)
+
+eval_EM(res = EM_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
+
+```
+
+#### robust
+
+```{r}
+EMR_res <- EM_Robust(t_coords)
+#EMR_res
+
+C_pred = length(EMR_res[["mu"]])
+plot_ellipse_n_center(t_coords = t_coords, res = EMR_res, mu_list = mu_list, C_pred = C_pred)
+
+eval_EM(res = EMR_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
+
+```
+
+## varing centers
+```{r}
+
+set.seed(2)
+m = 10 # NUMBER OF TESTS
+n <- 500     # Number of data points
+dim = 2
+
+wrong_ks = 0
+mu_error_list = numeric(m)
+score_list = numeric(m)
+sigma_error_list = numeric(m)
+
+for (i in 1:m) {
+  k = sample(2:5, size = 1) # number of clusters
+  mu_complete_list = list(c(0,0), c(0,5), c(5,0), c(-5,0), c(0,-5))
+  mu_list = sample(mu_complete_list, size = k)
+  prob = abs(rnorm(k, mean = 0, sd = 1)) + 1
+  I2_variance = abs(rnorm(k, mean = 0, sd = 0.3))+0.1
+  I2_list = lapply(I2_variance, function(x) diag(x,dim))
+  
+  #XZ = generate_GMM(n)
+  XZ = generate_GMM(n, k =k, dim = dim, mu_list = mu_list, prob = prob, I2_list=I2_list)
+  
+  coords = XZ[[1]]
+  group = XZ[[2]]
+  dat = cbind(coords,group)
+  colnames(dat) = c("X", "Y", "Group")
+  
+  # Plot the generated data
+  ggplot(data = dat) +
+    geom_point(aes(x = X, y = Y, colour = factor(Group)))
+  #plot(X, col = Z, pch = 16, main = "Generated Data")
+  
+  C = k #number of centers
+  Z <- sample(1:C, n, replace = T)
+  t_coords = t(coords)
+  
+  EMR_res <- EM_Robust(t_coords)
+  #EMR_res
+  
+  C_pred = length(EMR_res[["mu"]])
+  plot_ellipse_n_center(t_coords = t_coords, res = EMR_res, mu_list = mu_list, C_pred = C_pred)
+  
+  results = eval_EM(res = EMR_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
+  
+  if (results[1] != -1) {
+    mu_error_list[i] = results[["mu_error"]]
+    score_list[i] = results[["score"]]
+    sigma_error_list[i] = results[["sigma_error"]]
+    
+  } else {
+    wrong_ks = wrong_ks + 1
+    mu_error_list[i] = -1
+    score_list[i] = -1
+    sigma_error_list[i] = -1
+  }
+  
+}
+
+
+all_results = data.frame(cbind(mu_error_list, score_list, sigma_error_list))
+
+```
+```{r}
+library(knitr)
+
+print(paste("times of predicting wrong clusters numbers: ", wrong_ks))
+useful_results = subset(all_results, score_list!=-1)
+
+
+
+kable(useful_results, col.names = c("mean mu error", "center accuracy score", "mean sigma error"),digits = 4)
+
+```
+*mean mu error* is the mean euclidean distance between the true and predicted centers.  
+*center accuracy score* is the percentage of predicted centers that are with in the 0.1 threshold of true centers (which means they are close)
+*mean sigma error* is the mean euclidean distance between the true and predicted covariance matrix. 
+
+# results
+
+performance conclusion:
+
+<!-- -->
+
+a.  performs the same as original EM with correct cluster guess, performs better than the original with wrong guesses.
+b.  takes less iterations but more time
