@@ -92,7 +92,7 @@ EM_Robust <- function(X, nC, tol = 1e-10, m_iter=1e4) {
   # Estimates centers of Gaussian Mixture models without manual initialization:
   #
   # Args:
-  #   X: Data, d by n matrix, n obs, d variate
+  #   X: Data, d by n matrix, n obs, d variates
   #   tol: tolerance for convergence
   #   m_iter: max iterations
   #   nC: number of clusters, should be <= n
@@ -100,78 +100,105 @@ EM_Robust <- function(X, nC, tol = 1e-10, m_iter=1e4) {
   # Returns:
   #   The estimated K centers from data X, variances, and contributions 
   
-  n = dim(X)[2] # number of observations
+  # TODO: Shuffle the incoming data
   d = dim(X)[1] # dimension of data
-  nC <- n
-  # init beta:
+  n = dim(X)[2] # number of observations
+  # Init beta:
   beta = 1
   # init C, C idx is shifted by 1, C[[iter_t+1]] is C[[t]] 
   C <- list(nC)
-  # init alpha as 1/c(initial)
+  # Init alpha as 1/c(initial)
   alpha = rep(1/nC, nC)
-  # init mu with every observations in X
-  mu_update <- lapply(1:n, function(k) { X[,k] })
-  # init Sigma
-  tmp = ceiling(sqrt(n))
-  d_m = .Machine$double.xmax
-  
+  # Init mu with every observations in X
+  # TODO: Take a random sample of data points as initial mu if nC < n (pag 4), if so check seed
+  # idx_sample <- sample(1:n, nC)
+  # mu_update <- lapply(idx_sample, function(k) { X[,k] })
+  mu_update <- lapply(1:nC, function(k) { X[,k] })
+  # Init outliers
   outliers <- c()
+  
+  ## Initialize Sigma
+  
+  # Calculating d_min^2 and Q
+  d_m = .Machine$double.xmax
   for (i in 1:(n-1)) {
-    for (j in (i+1):n){
+    for (j in (i+1):n) {
       dif <- norm(X[,i] - X[,j], "2")^2
       if (dif > 0 & dif < d_m) {
         d_m = dif
       }
     }
   }
-  Sigma <- lapply(1:n, function(k, X, tmp, d, d_m) {
-    # Use eq 28 to avoid issue with matrix being close to singular
-    g <- 0.0001
-    (1-g)*norm(X[,k] - X[,tmp], "2")^2 * diag(d) + g*d_m*diag(d)
-  }, X, tmp, d, d_m)
-  # Initialize Z
-  Z <- as.data.frame(matrix(0, n, n))
+  Q <- d_m * diag(d)
+  
+  # Calculating initial sigma
+  Sigma <- list()
+  g <- 0.0001
+  for (k in 1:nC) {
+    # Creating Sigma_k with eq (27)
+    dist <- numeric(n)
+    for (i in 1:n) {
+      if (i != k) {
+        dist[i] = norm(X[,i] - mu_update[[k]], "2")^2
+      }
+    }
+    dist <- sort(dist)
+    d_k_c_init = dist[ceiling(sqrt(nC))]
+    
+    # Creating sigma tilde: Use eq (28) to avoid issue with matrix being close to singular. 
+    Sigma[[k]] <- (1-g)* d_k_c_init * diag(d) + g * Q
+  }
+  
+  ## Initialize Z
+  Z <- as.data.frame(matrix(0, n, nC))
+  is_stable <- F
   for (j in 1:n) {
-    for (k in 1:n) {
+    for (k in 1:nC) {
       Z[j,k] = alpha[k]*dmvnorm(mu_update[[k]], Sigma[[k]], X[,j])
     }
     Z[j,] <- Z[j,]/sum(Z[j,])
   }
+  
   # Compute first iteration of mu
-  mu_update <- lapply(1:C[[1]], function(k, X, Z) {
-    X %*% Z[,k]/sum(Z[,k])
-  }, X, Z)
+  mu_update <- list()
+  for (k in 1:C[[1]]) {
+    mu_update[[k]] <- X %*% Z[,k]/sum(Z[,k])
+  }
   mu <- mu_update
   
-  # Loop: 
+  # Loop:
   for (i in 1:m_iter) {
-    # update of alpha
-    a_em = colSums(Z)/n 
+    print(paste("i:", i))
+    print(paste("C:", C))
+    print(paste("beta:", beta))
+    
+    # step 5: update of alpha
+    a_em = colSums(Z)/n
     alpha_update = sapply(1:C[[i]], function(k, alpha, a_em) {
-      a_em[k] + alpha[k]*(log(alpha[k]) - t(alpha)%*%(log(alpha)))
+      a_em[k] + beta * alpha[k] * (log(alpha[k]) - t(alpha)%*%(log(alpha))) # where is beta?
     }, alpha, a_em)
     
-    # update beta
-    tmp1 <- (1-max(a_em))/(-max(alpha)*t(alpha)%*%alpha)
+    # step 6: update beta
+    tmp1 <- (1-max(a_em))/(-max(alpha)*t(alpha)%*%log(alpha)) # error in log(alpha)
     eta <- min(1, 0.5^floor(d/2 - 1))
     tmp2 <- 0
     for (k in 1:C[[i]]) { # eq 24
       tmp2<-tmp2+exp(-eta*n*abs(alpha_update[k] - alpha[k]))/C[[i]]
     }
-    # set to perma 0 when beta is set to 0 (stable C)
-    beta <- min(tmp1, tmp2, beta)
+    # stop updating beta (perm beta = 0) when C is stable
+    if (!is_stable) beta <- min(tmp1, tmp2)
     
-    # discard all clusters with contribution < 1/n
-    keep <- which(alpha_update >= 1/n)
-    
+    # step 7:
+    # discard all clusters with contribution <= 1/n
+    keep <- which(alpha_update > 1/n)
     alpha_update <- alpha_update[keep]
     # update mu (discard clusters)
     mu_update <- mu_update[keep]
     # update number of clusters
     C[[i+1]] <- length(alpha_update)
-    # update alpha, eq 15
+    # update alpha, eq (15)
     alpha <- alpha_update/sum(alpha_update)
-    # update Z, eq 16
+    # update Z, eq (16)
     Z <- as.matrix(Z[,keep])
     for (j in 1:n) {
       Z[j,] <- Z[j,]/sum(Z[j,])
@@ -180,9 +207,11 @@ EM_Robust <- function(X, nC, tol = 1e-10, m_iter=1e4) {
     if (i >= 60) {
       if (C[[i-59]] == C[[i+1]]) {
         beta <- 0
+        is_stable = T
       }
     }
     
+    # Extra: Identify outliers, by checking what went to NA on the first coordinate
     outlier <- which(is.na(Z[,1]))
     if (length(outlier) > 0) {
       Z <- Z[-outlier,]
@@ -191,6 +220,7 @@ EM_Robust <- function(X, nC, tol = 1e-10, m_iter=1e4) {
       n <- n - length(outlier)
     }
     
+    # TODO: check rest
     # update Sigma
     Sigma <- lapply(1:C[[i+1]], function(k, X, mu_update, Z, d, d_m) {
       gamma <- 0.0001
