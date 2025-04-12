@@ -39,10 +39,16 @@ EM_Robust <- function(X, nC, tol = 1e-10, m_iter=1e4) {
   #
   # Returns:
   #   The estimated K centers from data X, variances, and contributions 
-  
-  # TODO: Shuffle the incoming data
+
   d = dim(X)[1] # dimension of data
   n = dim(X)[2] # number of observations
+  
+  # Shuffle the incoming data to prevent bias when number of clusters
+  #  is less than n
+  set.seed(1)
+  random_shuffle <- sample(1:n, n)
+  X <- X[,random_shuffle]
+  
   # Init beta:
   beta = 1
   # init C, C idx is shifted by 1, C[[iter_t+1]] is C[[t]] 
@@ -50,9 +56,6 @@ EM_Robust <- function(X, nC, tol = 1e-10, m_iter=1e4) {
   # Init alpha as 1/c(initial)
   alpha = rep(1/nC, nC)
   # Init mu with every observations in X
-  # TODO: Take a random sample of data points as initial mu if nC < n (pag 4), if so check seed
-  # idx_sample <- sample(1:n, nC)
-  # mu_update <- lapply(idx_sample, function(k) { X[,k] })
   mu_update <- lapply(1:nC, function(k) { X[,k] })
   # Init outliers
   outliers <- c()
@@ -111,9 +114,9 @@ EM_Robust <- function(X, nC, tol = 1e-10, m_iter=1e4) {
   
   # Loop:
   for (i in 1:m_iter) {
-    print(paste("i:", i))
-    print(paste("C:", C))
-    print(paste("beta:", beta))
+    # print(paste("i:", i))
+    # print(paste("C:", C))
+    # print(paste("beta:", beta))
     # mu: Down here represents the previous mu value
     
     # Step 5: update of alpha
@@ -164,7 +167,7 @@ EM_Robust <- function(X, nC, tol = 1e-10, m_iter=1e4) {
       n <- n - length(outlier)
     }
     
-    # TODO: check rest
+
     # Step 8: 
     # update Sigma
     for (k in 1:C[[i+1]]) {
@@ -242,8 +245,10 @@ tol <- 1e-10
 m_iter <- 1e4
 ```
 
+
 ```{r}
-system.time(EM_res <- EM_Robust(X, 800))
+# print("hi")
+system.time(EM_res <- EM_Robust(X, 30))
 ```
 
 ```{r}
