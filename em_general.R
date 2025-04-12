@@ -174,10 +174,16 @@ EM_Robust <- function(X, nC, tol = 1e-10, m_iter=1e4) {
   
   # Loop:
   for (i in 1:m_iter) {
+<<<<<<< Updated upstream
     # print(paste("i:", i))
     # print(paste("C:", C))
     # print(paste("beta:", beta))
     # mu: Down here represents the previous mu value
+=======
+    #print(paste("i:", i))
+    #print(paste("C:", C))
+    #print(paste("beta:", beta))
+>>>>>>> Stashed changes
     
     # Step 5: update of alpha
     a_em = colSums(Z)/n

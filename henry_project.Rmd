@@ -100,7 +100,7 @@ plot_ellipse_n_center = function(t_coords, res, mu_list, C_pred){
 
 ### 2d sample with 3 mixtures
 
-```{r}
+```{r, eval=FALSE, echo=FALSE}
 set.seed(1)
 n <- 500     # Number of data points
 mu_list <- list(c(0,0), c(0,5), c(5,0))
@@ -127,7 +127,7 @@ ggplot(data = dat) +
 
 #### correct guess for centers
 
-```{r}
+```{r, eval=FALSE, echo=FALSE}
 C = 3 #number of centers
 Z <- sample(1:C, n, replace = T)
 t_coords = t(coords)
@@ -144,7 +144,7 @@ plot_ellipse_n_center(t_coords = t_coords, res = EM_res, mu_list = mu_list, C_pr
 
 #### robust
 
-```{r}
+```{r, eval=FALSE, echo=FALSE}
 EMR_res <- EM_Robust(t_coords, n-1)
 #EMR_res
 
@@ -159,7 +159,7 @@ eval_EM(res = EMR_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
 
 ### another 2d sample with 3 mixtures
 
-```{r}
+```{r, eval=FALSE, echo=FALSE}
 set.seed(1)
 n <- 800     # Number of data points
 mu_list <- list(c(2,2), c(-4,-4), c(-4,-4))
@@ -185,7 +185,7 @@ ggplot(data = dat) +
 
 #### correct guess for centers
 
-```{r}
+```{r, eval=FALSE, echo=FALSE}
 C = 3 #number of centers
 Z <- sample(1:C, n, replace = T)
 t_coords = t(coords)
@@ -202,7 +202,7 @@ eval_EM(res = EM_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
 
 #### robust
 
-```{r}
+```{r, eval=FALSE, echo=FALSE}
 EMR_res <- EM_Robust(t_coords, n-1)
 #EMR_res
 
@@ -215,7 +215,7 @@ eval_EM(res = EMR_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
 
 ### 2d sample with 5 mixtures
 
-```{r}
+```{r, eval=FALSE, echo=FALSE}
 set.seed(1)
 n <- 500     # Number of data points
 mu_list <- list(c(0,0), c(0,5), c(5,0), c(-5,0), c(0,-5))
@@ -241,7 +241,7 @@ ggplot(data = dat) +
 
 #### correct guess for centers
 
-```{r}
+```{r, eval=FALSE, echo=FALSE}
 C = 5 #number of centers
 Z <- sample(1:C, n, replace = T)
 t_coords = t(coords)
@@ -258,7 +258,7 @@ eval_EM(res = EM_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
 
 #### robust
 
-```{r}
+```{r, eval=FALSE, echo=FALSE}
 EMR_res <- EM_Robust(t_coords, n-1)
 EMR_res
 
@@ -271,7 +271,7 @@ eval_EM(res = EMR_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
 
 ### 3d sample with 3 mixtures
 
-```{r}
+```{r, eval=FALSE, echo=FALSE}
 library(plotly)
 set.seed(1)
 n <- 200     # Number of data points
@@ -305,7 +305,7 @@ ggplot(data = dat, aes(x=X, y=Y, colour = factor(Group))) +
 
 #### correct guess for centers
 
-```{r}
+```{r, eval=FALSE, echo=FALSE}
 C = 3 #number of centers
 Z <- sample(1:C, n, replace = T)
 t_coords = t(coords)
@@ -322,7 +322,7 @@ eval_EM(res = EM_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
 
 #### robust
 
-```{r}
+```{r, eval=FALSE, echo=FALSE}
 EMR_res <- EM_Robust(t_coords, n-1)
 #EMR_res
 
@@ -334,10 +334,10 @@ eval_EM(res = EMR_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
 ```
 
 ## varing centers
-```{r}
+```{r, eval=FALSE, echo=FALSE}
 
-set.seed(2)
-m = 3 # NUMBER OF TESTS
+set.seed(3)
+m = 40 # NUMBER OF TESTS
 n <- 200     # Number of data points
 dim = 2
 
@@ -353,7 +353,7 @@ original_sigma_error_list = numeric(m)
 
 for (i in 1:m) {
   k = sample(2:5, size = 1) # number of clusters
-  mu_complete_list = list(c(0,0), c(0,5), c(5,0), c(-5,0), c(0,-5))
+  mu_complete_list = list(c(0,0), c(0,4), c(4,0), c(-4,0), c(0,-4))
   mu_list = sample(mu_complete_list, size = k)
   prob = abs(rnorm(k, mean = 0, sd = 1)) + 1
   I2_variance = abs(rnorm(k, mean = 0, sd = 0.3))+0.1
@@ -376,7 +376,7 @@ for (i in 1:m) {
   Z <- sample(1:C, n, replace = T)
   t_coords = t(coords)
   
-  EM_res <- EM(X=t_coords, C=C, Z=Z, tol=1e-10, m_iter=1e3) # always true number of clusters
+  EM_res <- EM(X=t_coords, C=C, Z=Z, tol=1e-10, m_iter=1e5) # always true number of clusters
   
   original_results = eval_EM(res = EM_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
   
@@ -409,23 +409,114 @@ for (i in 1:m) {
 }
 
 
-all_results = data.frame(cbind(robust_mu_error_list, robust_score_list, robust_sigma_error_list, original_mu_error_list, original_score_list,original_sigma_error_list))
+all_results = data.frame(cbind(robust_mu_error_list, original_mu_error_list, robust_score_list, original_score_list, robust_sigma_error_list,  original_sigma_error_list))
 
 ```
-```{r}
+```{r, , eval=FALSE, echo=FALSE}
 library(knitr)
 
 print(paste("times of predicting wrong clusters numbers: ", wrong_ks))
-useful_results = subset(all_results, score_list!=-1)
+useful_results = subset(all_results, robust_score_list!=-1)
+col_means <- colMeans(useful_results, na.rm = TRUE)
+useful_results_with_mean <- rbind(useful_results, col_means)
+rownames(useful_results_with_mean)[nrow(useful_results_with_mean)] <- "Mean"
 
 
-
-kable(useful_results, col.names = c("robust mean mu error", "robust center accuracy score", "robust mean sigma error", "regular mean mu error", "regular center accuracy score", "regular mean sigma error"),digits = 4)
+kable(useful_results_with_mean, col.names = c("robust mean mu error", "regular mean mu error","robust center accuracy score", "regular center accuracy score","robust mean sigma error",   "regular mean sigma error"),digits = 4)
 
 ```
-*mean mu error* is the mean euclidean distance between the true and predicted centers.  
-*center accuracy score* is the percentage of predicted centers that are with in the 0.1 threshold of true centers (which means they are close)
-*mean sigma error* is the mean euclidean distance between the true and predicted covariance matrix. 
+*mean mu error* is the mean euclidean distance between the true and predicted centers. smaller the better  
+*center accuracy score* is the percentage of predicted centers that are with in the 0.1 threshold of true centers (which means they are close), closer to one the better   
+*mean sigma error* is the mean euclidean distance between the true and predicted covariance matrix. smaller the better 
+
+## varing sample size
+```{r}
+
+set.seed(3)
+n_seq = seq(from = 100, to = 700, by = 200)
+wrong_cluster_count = numeric(length(n_seq))
+
+for (j in 1:length(n_seq)){
+
+  m = 30 # NUMBER OF TESTS
+  n <- n_seq[j]   # Number of data points
+  dim = 2
+  
+  wrong_ks = 0
+  robust_mu_error_list = numeric(m)
+  robust_score_list = numeric(m)
+  robust_sigma_error_list = numeric(m)
+  
+  # original EM
+  #original_mu_error_list = numeric(m)
+  #original_score_list = numeric(m)
+  #original_sigma_error_list = numeric(m)
+  
+  for (i in 1:m) {
+    k = sample(2:5, size = 1) # number of clusters
+    mu_complete_list = list(c(0,0), c(0,4), c(4,0), c(-4,0), c(0,-4))
+    mu_list = sample(mu_complete_list, size = k)
+    prob = abs(rnorm(k, mean = 0, sd = 1)) + 1
+    I2_variance = abs(rnorm(k, mean = 0, sd = 0.3))+0.1
+    I2_list = lapply(I2_variance, function(x) diag(x,dim))
+    
+    #XZ = generate_GMM(n)
+    XZ = generate_GMM(n, k =k, dim = dim, mu_list = mu_list, prob = prob, I2_list=I2_list)
+    
+    coords = XZ[[1]]
+    group = XZ[[2]]
+    dat = cbind(coords,group)
+    colnames(dat) = c("X", "Y", "Group")
+    
+    # Plot the generated data
+    ggplot(data = dat) +
+      geom_point(aes(x = X, y = Y, colour = factor(Group)))
+    #plot(X, col = Z, pch = 16, main = "Generated Data")
+    
+    C = k #number of centers
+    Z <- sample(1:C, n, replace = T)
+    t_coords = t(coords)
+    
+    #EM_res <- EM(X=t_coords, C=C, Z=Z, tol=1e-10, m_iter=1e5) # always true number of clusters
+    
+    #original_results = eval_EM(res = EM_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
+    
+    #original_mu_error_list[i] = original_results[["mu_error"]]
+    #original_score_list[i] = original_results[["score"]]
+    #original_sigma_error_list[i] = original_results[["sigma_error"]]
+    
+    ########################
+    
+    EMR_res <- EM_Robust(t_coords, n-1)
+    #EMR_res
+    
+    C_pred = length(EMR_res[["mu"]])
+    plot_ellipse_n_center(t_coords = t_coords, res = EMR_res, mu_list = mu_list, C_pred = C_pred)
+    
+    robust_results = eval_EM(res = EMR_res, mu_list = mu_list, dim = dim, I2_list=I2_list)
+    
+    if (robust_results[1] != -1) {
+      robust_mu_error_list[i] = robust_results[["mu_error"]]
+      robust_score_list[i] = robust_results[["score"]]
+      robust_sigma_error_list[i] = robust_results[["sigma_error"]]
+      
+    } else {
+      wrong_ks = wrong_ks + 1
+      #robust_mu_error_list[i] = -1
+      #robust_score_list[i] = -1
+      #robust_sigma_error_list[i] = -1
+    }
+    
+  }
+  
+  
+  wrong_cluster_count[j] = wrong_ks
+}
+print(wrong_cluster_count)
+```
+
+
+
 
 # results
 
@@ -433,5 +524,7 @@ performance conclusion:
 
 <!-- -->
 
-a. If robust is predicting correct number of clusters, it's accuracy is the same as original EM with correct cluster guess
-b.  takes less iterations but more time
+a. If robust is predicting correct number of clusters, it's accuracy is the same as original EM with correct cluster guess  
+b.  takes less iterations but more time  
+c. When there are not that many data points, robust EM tend to get number of clusters wrong more easily.  
+d. When there are not that many data points, robust EM performs better in accuracy if it finds the correct number of scores
