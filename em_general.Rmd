@@ -170,6 +170,7 @@ EM_Robust <- function(X, nC, tol = 1e-10, m_iter=1e4) {
 
     # Step 8: 
     # update Sigma
+    Sigma <- list()
     for (k in 1:C[[i+1]]) {
       gamma <- 0.0001
       # compute all X_i - Mu
@@ -190,6 +191,7 @@ EM_Robust <- function(X, nC, tol = 1e-10, m_iter=1e4) {
     }
     # Step 10:
     # update mu
+    mu_update <- list()
     for (k in 1:C[[i+1]]) {
       mu_update[[k]] <- X %*% Z[,k]/sum(Z[,k])
     }
