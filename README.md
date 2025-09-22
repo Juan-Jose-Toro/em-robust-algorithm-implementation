@@ -1,1 +1,1 @@
-# stat440_final_project
+# EM Robust Algorithm Implementation
